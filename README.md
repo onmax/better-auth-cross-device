@@ -1,3 +1,3 @@
-# @onmax/cross-device
+# better-auth-cross-device
 
-Better Auth plugin for cross-device authentication flows.
+Better Auth cross-device plugin published as `@onmax/better-auth-cross-device`.

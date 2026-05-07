@@ -1,7 +1,7 @@
 {
   "name": "@onmax/better-auth-cross-device",
   "version": "0.0.0",
-  "description": "Better Auth plugin for cross-device authentication flows",
+  "description": "Better Auth cross-device plugin",
   "homepage": "https://github.com/onmax/better-auth-cross-device#readme",
   "bugs": {
     "url": "https://github.com/onmax/better-auth-cross-device/issues"
