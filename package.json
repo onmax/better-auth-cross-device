@@ -1,16 +1,15 @@
 {
-  "name": "@onmax/cross-device",
+  "name": "@onmax/better-auth-cross-device",
   "version": "0.0.0",
   "description": "Better Auth plugin for cross-device authentication flows",
-  "homepage": "https://onmax-mini-apps-sdk.onmax.me/reference/packages",
+  "homepage": "https://github.com/onmax/better-auth-cross-device#readme",
   "bugs": {
-    "url": "https://github.com/onmax/nimiq-pay-utils/issues"
+    "url": "https://github.com/onmax/better-auth-cross-device/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/onmax/nimiq-pay-utils.git",
-    "directory": "cross-device"
+    "url": "git+https://github.com/onmax/better-auth-cross-device.git"
   },
   "files": [
     "dist"
@@ -41,13 +40,19 @@
     "dev": "vp pack --watch",
     "prepack": "pnpm build",
     "check:exports": "publint && attw --pack --profile esm-only",
-    "ci": "vp check && vp pack && pnpm check:exports"
+    "test": "vp test",
+    "ci": "vp check && vp test && vp pack && pnpm check:exports"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.2.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
     "better-auth": "^1.6.9",
     "publint": "^0.3.19",
-    "vite-plus": "^0.1.20"
+    "vite-plus": "^0.1.20",
+    "vitest": "^4.1.5"
   },
   "peerDependencies": {
     "better-auth": ">=1.4.18 <2"

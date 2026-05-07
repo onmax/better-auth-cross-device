@@ -1,6 +1,9 @@
-import { defineConfig } from "vite-plus";
+import { defineConfig } from "vite-plus"
 
 export default defineConfig({
+  fmt: {
+    semi: false,
+  },
   lint: {
     options: {
       typeAware: true,
@@ -13,4 +16,9 @@ export default defineConfig({
     format: ["esm"],
     platform: "neutral",
   },
-});
+  test: {
+    include: ["test/**/*.test.ts"],
+    environment: "node",
+    testTimeout: 30_000,
+  },
+})
