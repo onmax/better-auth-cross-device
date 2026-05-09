@@ -269,9 +269,7 @@ export async function runStart(
   body: Record<string, unknown>,
   contextOverrides: Record<string, unknown> = {},
 ) {
-  return testEndpoints(plugin).crossDeviceStart(
-    createContext(store, { ...contextOverrides, body }),
-  )
+  return testEndpoints(plugin).crossDeviceStart(createContext(store, { ...contextOverrides, body }))
 }
 
 function bodyContext(store: Store, path: string, body: Record<string, unknown>) {
