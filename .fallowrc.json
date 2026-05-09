@@ -1,0 +1,4 @@
+{
+  "$schema": "https://docs.fallow.tools/schema.json",
+  "ignoreDependencies": ["@nuxthub/core", "docus", "better-sqlite3"]
+}

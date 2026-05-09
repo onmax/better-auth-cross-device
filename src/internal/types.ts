@@ -184,13 +184,6 @@ export interface CrossDeviceStartResponse {
   expiresAt: number
 }
 
-export interface CrossDeviceEventPayload {
-  orderId: string
-  status: CrossDeviceOrderEvent
-  kind: CrossDeviceOrderKind
-  redirectTo: string
-}
-
 export interface CrossDeviceClientError {
   message?: string
   code?: string

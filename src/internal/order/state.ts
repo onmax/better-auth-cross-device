@@ -1,7 +1,7 @@
 import type { StoredCrossDeviceOrderStatus, StoredOrderRecord } from "../types"
 import { CROSS_DEVICE_ERROR_CODES, crossDeviceApiError } from "../error-codes"
 
-export const TERMINAL_ORDER_STATUSES = new Set<StoredCrossDeviceOrderStatus>([
+const TERMINAL_ORDER_STATUSES = new Set<StoredCrossDeviceOrderStatus>([
   "expired",
   "rejected",
   "cancelled",

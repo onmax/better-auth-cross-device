@@ -1,5 +1,17 @@
 import { APIError } from "better-auth"
 import { vi } from "vitest"
+import { crossDevice } from "../src/index"
+import type {
+  CrossDeviceAdapter,
+  CrossDeviceApproveResponse,
+  CrossDeviceCancelResponse,
+  CrossDeviceChallengeResponse,
+  CrossDeviceClaimResponse,
+  CrossDeviceFinalizeResponse,
+  CrossDevicePluginOptions,
+  CrossDeviceRejectResponse,
+  CrossDeviceStartResponse,
+} from "../src/index"
 import { createCrossDeviceOrderLifecycle } from "../src/internal/order/lifecycle"
 import type {
   CrossDeviceAdapterCreateInput,
@@ -11,7 +23,7 @@ import type {
   CrossDeviceUser,
 } from "../src/internal/types"
 
-export interface StoredRecord {
+interface StoredRecord {
   id: string
   publicId?: string
   [key: string]: unknown
@@ -168,6 +180,169 @@ export function createLifecycle(
           }),
     resolveLogin: options.resolveLogin,
   })
+}
+
+type CrossDevicePlugin = ReturnType<typeof crossDevice>
+type Store = ReturnType<typeof createStore>
+
+type TestEndpoint<T> = (ctx: ReturnType<typeof createContext>) => T | Promise<T>
+
+export interface TestCrossDeviceEndpoints {
+  crossDeviceApprove: TestEndpoint<CrossDeviceApproveResponse>
+  crossDeviceCancel: TestEndpoint<CrossDeviceCancelResponse>
+  crossDeviceChallenge: TestEndpoint<CrossDeviceChallengeResponse>
+  crossDeviceClaim: TestEndpoint<CrossDeviceClaimResponse>
+  crossDeviceEvents: TestEndpoint<Response>
+  crossDeviceFinalize: TestEndpoint<CrossDeviceFinalizeResponse>
+  crossDeviceReject: TestEndpoint<CrossDeviceRejectResponse>
+  crossDeviceStart: TestEndpoint<CrossDeviceStartResponse & { desktopToken: string }>
+}
+
+function asEndpoint<T>(handler: (ctx: never) => T | Promise<T>): TestEndpoint<T> {
+  return (ctx) => handler(ctx as never)
+}
+
+export function testEndpoints(plugin: CrossDevicePlugin): TestCrossDeviceEndpoints {
+  return {
+    crossDeviceApprove: asEndpoint(plugin.endpoints.crossDeviceApprove),
+    crossDeviceCancel: asEndpoint(plugin.endpoints.crossDeviceCancel),
+    crossDeviceChallenge: asEndpoint(plugin.endpoints.crossDeviceChallenge),
+    crossDeviceClaim: asEndpoint(plugin.endpoints.crossDeviceClaim),
+    crossDeviceEvents: asEndpoint(plugin.endpoints.crossDeviceEvents),
+    crossDeviceFinalize: asEndpoint(plugin.endpoints.crossDeviceFinalize),
+    crossDeviceReject: asEndpoint(plugin.endpoints.crossDeviceReject),
+    crossDeviceStart: asEndpoint(plugin.endpoints.crossDeviceStart),
+  }
+}
+
+const ENDPOINT_BASE = "https://app.example/api/auth/cross-device"
+
+interface TestPluginOptions {
+  trustedOrigins?: string[]
+  verifyProof?: CrossDeviceAdapter["verifyProof"]
+  resolveLogin?: CrossDevicePluginOptions["resolveLogin"]
+  subject?: string
+}
+
+export function createLoginLifecycle(store: Store) {
+  return createLifecycle({
+    kind: "login",
+    resolveLogin: async ({ approvedSubject }) =>
+      store.internalAdapter.createUser({ email: `${approvedSubject}@example.invalid` }),
+  })
+}
+
+export function signedVerifyProof(
+  buildArtifact: (record: Record<string, string>) => unknown = (record) => record,
+): CrossDeviceAdapter["verifyProof"] {
+  return ({ challenge, proof }) => {
+    const record = proof as Record<string, string>
+    if (record.signature !== `sig:${challenge.message}`) throw new Error("bad proof")
+    return {
+      ok: true as const,
+      subject: record.subject,
+      identity: { address: "NQ07TEST" },
+      proofArtifact: buildArtifact(record),
+    }
+  }
+}
+
+export function createTestPlugin(opts: TestPluginOptions = {}): CrossDevicePlugin {
+  const subject = opts.subject ?? "pk-shape"
+  return crossDevice({
+    appName: "Dino",
+    trustedOrigins: opts.trustedOrigins ?? ["https://app.example"],
+    adapters: [
+      {
+        id: "nimiq",
+        createChallenge: (input) => `order=${input.orderId};nonce=${input.nonce}`,
+        verifyProof: opts.verifyProof ?? (() => ({ ok: true as const, subject })),
+      },
+    ],
+    resolveLogin: opts.resolveLogin,
+  })
+}
+
+export async function runStart(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  body: Record<string, unknown>,
+  contextOverrides: Record<string, unknown> = {},
+) {
+  return testEndpoints(plugin).crossDeviceStart(
+    createContext(store, { ...contextOverrides, body }),
+  )
+}
+
+function bodyContext(store: Store, path: string, body: Record<string, unknown>) {
+  return createContext(store, {
+    request: { url: `${ENDPOINT_BASE}/${path}` },
+    body,
+  })
+}
+
+export async function runClaim(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  body: { orderId: string; claimToken: string },
+) {
+  return testEndpoints(plugin).crossDeviceClaim(bodyContext(store, "claim", body))
+}
+
+export async function runChallenge(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  body: { orderId: string; challengeToken: string },
+) {
+  return testEndpoints(plugin).crossDeviceChallenge(bodyContext(store, "challenge", body))
+}
+
+export async function runApprove(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  body: { orderId: string; challengeToken: string; proof: unknown },
+) {
+  return testEndpoints(plugin).crossDeviceApprove(bodyContext(store, "approve", body))
+}
+
+export async function runReject(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  body: { orderId: string; challengeToken: string },
+) {
+  return testEndpoints(plugin).crossDeviceReject(bodyContext(store, "reject", body))
+}
+
+export async function runCancel(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  body: { orderId: string; desktopToken: string },
+) {
+  return testEndpoints(plugin).crossDeviceCancel(bodyContext(store, "cancel", body))
+}
+
+export async function runFinalize(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  body: { orderId: string; desktopToken: string },
+) {
+  return testEndpoints(plugin).crossDeviceFinalize(bodyContext(store, "finalize", body))
+}
+
+export async function claimAndChallenge(
+  plugin: CrossDevicePlugin,
+  store: Store,
+  start: { orderId: string; claimToken: string },
+) {
+  const claimed = await runClaim(plugin, store, {
+    orderId: start.orderId,
+    claimToken: start.claimToken,
+  })
+  const challenge = await runChallenge(plugin, store, {
+    orderId: start.orderId,
+    challengeToken: claimed.challengeToken,
+  })
+  return { claimed, challenge }
 }
 
 export async function approveOrder(

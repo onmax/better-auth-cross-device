@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { approveOrder, createContext, createLifecycle, createStore } from "./helpers"
+import {
+  approveOrder,
+  createContext,
+  createLifecycle,
+  createLoginLifecycle,
+  createStore,
+} from "./helpers"
 
 describe("cross-device order lifecycle", () => {
   it("owns login finalization and returns session data for the route adapter", async () => {
@@ -103,13 +109,7 @@ describe("cross-device order lifecycle", () => {
         updatedAt: now,
       }
     })
-    const lifecycle = createLifecycle({
-      kind: "login",
-      resolveLogin: async ({ approvedSubject }) =>
-        store.internalAdapter.createUser({
-          email: `${approvedSubject}@example.invalid`,
-        }),
-    })
+    const lifecycle = createLoginLifecycle(store)
     const { started } = await approveOrder(lifecycle, ctx, { kind: "login" })
 
     const firstFinalize = lifecycle.finalize(ctx, started.orderId, started.desktopToken)
@@ -128,13 +128,7 @@ describe("cross-device order lifecycle", () => {
     const store = createStore()
     const ctx = createContext(store)
     store.internalAdapter.createSession.mockResolvedValue(null)
-    const lifecycle = createLifecycle({
-      kind: "login",
-      resolveLogin: async ({ approvedSubject }) =>
-        store.internalAdapter.createUser({
-          email: `${approvedSubject}@example.invalid`,
-        }),
-    })
+    const lifecycle = createLoginLifecycle(store)
     const { started } = await approveOrder(lifecycle, ctx, { kind: "login" })
 
     await expect(lifecycle.finalize(ctx, started.orderId, started.desktopToken)).rejects.toThrow(

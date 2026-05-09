@@ -48,10 +48,16 @@ function normalizeFetcherResponse<T>(response: FetcherResponse<T>): CrossDeviceC
   return { data: response as T, error: null }
 }
 
-function readFetcherError(error: unknown): CrossDeviceClientError {
+function readFetcherErrorPrimitive(error: unknown): CrossDeviceClientError | null {
   if (typeof error === "string" && error.trim()) return { message: error }
   if (error instanceof Error) return { message: error.message }
   if (!error || typeof error !== "object") return { message: "Request failed" }
+  return null
+}
+
+function readFetcherError(error: unknown): CrossDeviceClientError {
+  const primitive = readFetcherErrorPrimitive(error)
+  if (primitive) return primitive
 
   const record = error as Record<string, unknown>
   return {

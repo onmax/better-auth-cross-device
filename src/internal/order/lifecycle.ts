@@ -307,6 +307,42 @@ export function createCrossDeviceOrderLifecycle(
     }
   }
 
+  function assertApprovalGuards(
+    activeOrder: StoredOrderRecord,
+    input: { challengeToken: string; origin: string; enforceOrigin: boolean },
+  ): void {
+    if (input.enforceOrigin && activeOrder.origin !== input.origin)
+      throw crossDeviceApiError("BAD_REQUEST", CROSS_DEVICE_ERROR_CODES.ORIGIN_MISMATCH)
+
+    assertOrderToken(
+      activeOrder,
+      input.challengeToken,
+      "challengeTokenHash",
+      "INVALID_CHALLENGE_TOKEN",
+    )
+  }
+
+  async function verifyApprovalProof(
+    activeOrder: StoredOrderRecord,
+    proof: unknown,
+  ): Promise<CrossDeviceVerifiedProof> {
+    const adapter = getAdapter(options.adapters, activeOrder.adapterId)
+    let verified: CrossDeviceVerifiedProof
+    try {
+      verified = await adapter.verifyProof(buildProofVerificationInput(activeOrder, proof))
+    } catch (error) {
+      throw options.normalizeProofError(error, {
+        orderId: publicOrderId(activeOrder),
+        adapterId: activeOrder.adapterId,
+      })
+    }
+
+    if (!verified.ok || !verified.subject.trim())
+      throw crossDeviceApiError("UNAUTHORIZED", CROSS_DEVICE_ERROR_CODES.INVALID_PROOF)
+
+    return verified
+  }
+
   return {
     async start(ctx, input) {
       const adapterId = input.adapterId || options.firstAdapterId
@@ -437,38 +473,12 @@ export function createCrossDeviceOrderLifecycle(
     async approve(ctx, input) {
       const activeOrder = await loadActiveOrder(ctx, input.orderId)
       assertCanApprove(activeOrder)
+      assertApprovalGuards(activeOrder, input)
 
-      if (input.enforceOrigin && activeOrder.origin !== input.origin)
-        throw crossDeviceApiError("BAD_REQUEST", CROSS_DEVICE_ERROR_CODES.ORIGIN_MISMATCH)
+      if (activeOrder.status === "approved")
+        return { ok: true, orderId: publicOrderId(activeOrder), status: "approved" }
 
-      assertOrderToken(
-        activeOrder,
-        input.challengeToken,
-        "challengeTokenHash",
-        "INVALID_CHALLENGE_TOKEN",
-      )
-
-      if (activeOrder.status === "approved") {
-        return {
-          ok: true,
-          orderId: publicOrderId(activeOrder),
-          status: "approved",
-        }
-      }
-
-      const adapter = getAdapter(options.adapters, activeOrder.adapterId)
-      let verified: CrossDeviceVerifiedProof
-      try {
-        verified = await adapter.verifyProof(buildProofVerificationInput(activeOrder, input.proof))
-      } catch (error) {
-        throw options.normalizeProofError(error, {
-          orderId: publicOrderId(activeOrder),
-          adapterId: activeOrder.adapterId,
-        })
-      }
-
-      if (!verified.ok || !verified.subject.trim())
-        throw crossDeviceApiError("UNAUTHORIZED", CROSS_DEVICE_ERROR_CODES.INVALID_PROOF)
+      const verified = await verifyApprovalProof(activeOrder, input.proof)
 
       await transitionOrConflict(ctx, activeOrder, ACTIVE_APPROVAL_STATUSES, {
         status: "approved",
@@ -480,11 +490,7 @@ export function createCrossDeviceOrderLifecycle(
           verified.proofArtifact !== undefined ? JSON.stringify(verified.proofArtifact) : null,
       })
 
-      return {
-        ok: true,
-        orderId: publicOrderId(activeOrder),
-        status: "approved",
-      }
+      return { ok: true, orderId: publicOrderId(activeOrder), status: "approved" }
     },
 
     async reject(ctx, orderId, challengeToken) {

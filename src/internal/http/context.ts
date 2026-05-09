@@ -5,21 +5,34 @@ import type { CrossDeviceRuntimeContext } from "../types"
 
 type SessionCookieContext = Parameters<typeof setSessionCookie>[0]
 
-function readHeader(ctx: CrossDeviceRuntimeContext, name: string): string | null {
-  const lowerName = name.toLowerCase()
-  const requestHeaders = ctx?.request?.headers
-  if (requestHeaders?.get) {
-    const value = requestHeaders.get(lowerName) ?? requestHeaders.get(name)
-    if (typeof value === "string" && value.trim()) return value.trim()
-  }
+function readNonEmpty(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
 
-  const headers = ctx?.headers
-  if (headers && typeof headers === "object") {
-    const value = headers[lowerName] ?? headers[name]
-    if (typeof value === "string" && value.trim()) return value.trim()
+function readFromGetter(headers: Headers | undefined, names: string[]): string | null {
+  if (!headers?.get) return null
+  for (const name of names) {
+    const found = readNonEmpty(headers.get(name))
+    if (found) return found
   }
-
   return null
+}
+
+function readFromObject(
+  headers: Record<string, unknown> | undefined,
+  names: string[],
+): string | null {
+  if (!headers || typeof headers !== "object") return null
+  for (const name of names) {
+    const found = readNonEmpty(headers[name])
+    if (found) return found
+  }
+  return null
+}
+
+function readHeader(ctx: CrossDeviceRuntimeContext, name: string): string | null {
+  const names = [name.toLowerCase(), name]
+  return readFromGetter(ctx?.request?.headers, names) ?? readFromObject(ctx?.headers, names)
 }
 
 export function resolveOrigin(ctx: CrossDeviceRuntimeContext): string {
