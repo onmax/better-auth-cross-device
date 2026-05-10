@@ -75,6 +75,19 @@ describe("cross-device HTTP context", () => {
     ).toThrow(CROSS_DEVICE_ERROR_CODES.UNTRUSTED_ORIGIN.message)
   })
 
+  it("calls Better Auth origin checks with the auth context receiver", () => {
+    const context = {
+      trustedOrigins: ["https://app.example"],
+      isTrustedOrigin(origin: string) {
+        return this.trustedOrigins.includes(origin)
+      },
+    }
+
+    expect(() =>
+      assertTrustedOrigin({ context }, "https://app.example", new Set(["https://app.example"])),
+    ).not.toThrow()
+  })
+
   it("applies finalized login session cookies and token header", async () => {
     const setHeader = vi.fn()
     const now = new Date()

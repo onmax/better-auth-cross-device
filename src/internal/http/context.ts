@@ -56,9 +56,8 @@ export function assertTrustedOrigin(
   origin: string,
   fallbackTrustedOrigins: Set<string>,
 ): void {
-  const checkTrustedOrigin = ctx.context?.isTrustedOrigin
   const trustedByBetterAuth =
-    typeof checkTrustedOrigin === "function" ? checkTrustedOrigin(origin) : true
+    typeof ctx.context?.isTrustedOrigin === "function" ? ctx.context.isTrustedOrigin(origin) : true
   const trustedByPlugin = fallbackTrustedOrigins.size === 0 || fallbackTrustedOrigins.has(origin)
   const trusted = trustedByBetterAuth && trustedByPlugin
 
